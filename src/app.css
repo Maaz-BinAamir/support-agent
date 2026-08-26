@@ -102,6 +102,12 @@ textarea::placeholder { color: #71837a; }
 .answer-copy code { padding: .12em .35em; border: 1px solid rgba(208, 242, 125, .18); border-radius: 3px; color: var(--lime); background: rgba(208, 242, 125, .08); font: .84em 'DM Mono', monospace; }
 .answer-copy pre { overflow-x: auto; margin: 12px 0 17px; padding: 15px 17px; border: 1px solid rgba(208, 242, 125, .19); border-radius: 4px; background: #0d1513; }
 .answer-copy pre code { padding: 0; border: 0; border-radius: 0; color: #dce8bf; background: transparent; font: 13px/1.65 'DM Mono', monospace; white-space: pre; }
+.markdown-table-wrap { overflow-x: auto; margin: 14px 0 18px; border: 1px solid var(--line); border-radius: 4px; background: rgba(13, 21, 19, .58); }
+.answer-copy table { width: 100%; min-width: 540px; border-collapse: collapse; font-size: 13px; line-height: 1.45; }
+.answer-copy :is(th, td) { padding: 10px 12px; border-bottom: 1px solid var(--line); text-align: left; vertical-align: top; }
+.answer-copy th { color: var(--lime); background: rgba(208, 242, 125, .07); font: 10px 'DM Mono', monospace; letter-spacing: .04em; text-transform: uppercase; }
+.answer-copy td { color: var(--muted); }
+.answer-copy tbody tr:last-child td { border-bottom: 0; }
 .cursor { display: inline-block; width: 7px; height: 19px; margin-left: 4px; vertical-align: -2px; background: var(--lime); animation: blink .9s steps(2) infinite; }
 .citation-heading { display: flex; align-items: center; gap: 8px; margin-bottom: 10px; color: var(--muted); font: 10px 'DM Mono', monospace; letter-spacing: .07em; text-transform: uppercase; }
 .citation-count { display: grid; place-items: center; width: 18px; height: 18px; border-radius: 50%; color: var(--lime); background: var(--lime-soft); font-size: 9px; }

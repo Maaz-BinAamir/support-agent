@@ -27,6 +27,16 @@ function isListItem(line: string) {
 	return /^(?:[-*+] |\d+[.)] )/.test(line);
 }
 
+function splitTableRow(line: string) {
+	const trimmed = line.trim().replace(/^\|/, '').replace(/\|$/, '');
+	return trimmed.split('|').map((cell) => cell.trim());
+}
+
+function isTableSeparator(line: string) {
+	const cells = splitTableRow(line);
+	return cells.length > 0 && cells.every((cell) => /^:?-{3,}:?$/.test(cell));
+}
+
 /**
  * Renders the Markdown used in model answers without allowing answer content
  * to introduce arbitrary HTML. It intentionally supports the compact syntax
@@ -63,6 +73,31 @@ export function renderMarkdown(markdown: string) {
 			const level = heading[1].length;
 			blocks.push(`<h${level}>${renderInline(heading[2])}</h${level}>`);
 			index += 1;
+			continue;
+		}
+
+		if (line.includes('|') && index + 1 < lines.length && isTableSeparator(lines[index + 1])) {
+			const headers = splitTableRow(line);
+			const alignments = splitTableRow(lines[index + 1]).map((cell) => {
+				if (cell.startsWith(':') && cell.endsWith(':')) return 'center';
+				if (cell.startsWith(':')) return 'left';
+				if (cell.endsWith(':')) return 'right';
+				return '';
+			});
+			index += 2;
+			const rows: string[] = [];
+			while (index < lines.length && lines[index].includes('|') && lines[index].trim()) {
+				const cells = splitTableRow(lines[index]);
+				rows.push(`<tr>${headers.map((_, cellIndex) => {
+					const alignment = alignments[cellIndex] ? ` style="text-align:${alignments[cellIndex]}"` : '';
+					return `<td${alignment}>${renderInline(cells[cellIndex] ?? '')}</td>`;
+				}).join('')}</tr>`);
+				index += 1;
+			}
+			blocks.push(`<div class="markdown-table-wrap"><table><thead><tr>${headers.map((header, cellIndex) => {
+				const alignment = alignments[cellIndex] ? ` style="text-align:${alignments[cellIndex]}"` : '';
+				return `<th${alignment}>${renderInline(header)}</th>`;
+			}).join('')}</tr></thead><tbody>${rows.join('')}</tbody></table></div>`);
 			continue;
 		}
 
