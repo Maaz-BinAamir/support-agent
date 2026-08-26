@@ -1,0 +1,32 @@
+{
+  "name": "support-agent",
+  "private": true,
+  "type": "module",
+  "packageManager": "bun@1.4.0",
+  "scripts": {
+    "dev": "vite dev",
+    "build": "vite build",
+    "check": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json",
+    "retrieval:dev": "uv --cache-dir .uv-cache --directory services/retrieval run python -c \"from app.main import run; run()\"",
+    "retrieval:ingest": "uv --cache-dir .uv-cache --directory services/retrieval run python -c \"from app.ingest import main; main()\"",
+    "preview": "vite preview",
+    "format": "prettier --write ."
+  },
+  "devDependencies": {
+    "@sveltejs/adapter-auto": "^7.0.1",
+    "@sveltejs/kit": "2.70.3",
+    "@sveltejs/vite-plugin-svelte": "6.2.4",
+    "@types/node": "^24.3.0",
+    "prettier": "^3.6.2",
+    "prettier-plugin-svelte": "^3.4.0",
+    "svelte": "5.56.10",
+    "svelte-check": "^4.3.1",
+    "typescript": "^5.9.2",
+    "vite": "7.3.6"
+  },
+  "dependencies": {
+    "ai": "^5.0.35",
+    "@ai-sdk/groq": "^2.0.19",
+    "zod": "^4.0.17"
+  }
+}
