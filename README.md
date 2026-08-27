@@ -2,6 +2,18 @@
 
 A local support desk for Cloudflare Workers. It answers from a dated snapshot of official docs, cites the passages it used, and abstains when the snapshot does not cover the question.
 
+<p align="center">
+  <img width="1920" height="1080" alt="Welcome screen" src="https://github.com/user-attachments/assets/ec053405-bcfa-48e9-80ae-f650e50927d1" />
+  <br>
+  <em>Welcome screen</em>
+</p>
+
+<p align="center">
+  <img width="1920" height="1080" alt="Example query" src="https://github.com/user-attachments/assets/b2779afa-594e-471e-917d-b191f186fff1" />
+  <br>
+  <em>An example query</em>
+</p>
+
 ## How it answers
 
 ```text
