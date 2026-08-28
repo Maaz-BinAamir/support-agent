@@ -8,19 +8,19 @@ function escapeHtml(value: string) {
 }
 
 function renderInline(value: string) {
-	const codeParts = value.split(/(`[^`]+`)/g);
+	const codeSpans: string[] = [];
+	const tokenized = value.replace(/`([^`]+)`/g, (_, code: string) => {
+		const token = `\0${codeSpans.length}\0`;
+		codeSpans.push(`<code>${escapeHtml(code)}</code>`);
+		return token;
+	});
+	const rendered = escapeHtml(tokenized)
+		.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
+		.replace(/__(.+?)__/g, '<strong>$1</strong>')
+		.replace(/(?<!\*)\*([^*\n]+)\*(?!\*)/g, '<em>$1</em>')
+		.replace(/(?<!_)_([^_\n]+)_(?!_)/g, '<em>$1</em>');
 
-	return codeParts
-		.map((part, index) => {
-			if (index % 2 === 1) return `<code>${escapeHtml(part.slice(1, -1))}</code>`;
-
-			return escapeHtml(part)
-				.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
-				.replace(/__(.+?)__/g, '<strong>$1</strong>')
-				.replace(/(?<!\*)\*([^*\n]+)\*(?!\*)/g, '<em>$1</em>')
-				.replace(/(?<!_)_([^_\n]+)_(?!_)/g, '<em>$1</em>');
-		})
-		.join('');
+	return rendered.replace(/\0(\d+)\0/g, (_, index: string) => codeSpans[Number(index)] ?? '');
 }
 
 function isListItem(line: string) {
