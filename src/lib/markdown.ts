@@ -37,6 +37,14 @@ function isTableSeparator(line: string) {
 	return cells.length > 0 && cells.every((cell) => /^:?-{3,}:?$/.test(cell));
 }
 
+function matchCodeFence(line: string) {
+	return line.match(/^\s*```\s*([^\s`]*)\s*$/);
+}
+
+function isClosingCodeFence(line: string) {
+	return /^\s*```\s*$/.test(line);
+}
+
 /**
  * Renders the Markdown used in model answers without allowing answer content
  * to introduce arbitrary HTML. It intentionally supports the compact syntax
@@ -54,12 +62,12 @@ export function renderMarkdown(markdown: string) {
 			continue;
 		}
 
-		const fence = line.match(/^```\s*([^\s]*)\s*$/);
+		const fence = matchCodeFence(line);
 		if (fence) {
 			const language = fence[1] ? ` language-${escapeHtml(fence[1])}` : '';
 			index += 1;
 			const code: string[] = [];
-			while (index < lines.length && !/^```\s*$/.test(lines[index])) {
+			while (index < lines.length && !isClosingCodeFence(lines[index])) {
 				code.push(lines[index]);
 				index += 1;
 			}
@@ -117,7 +125,7 @@ export function renderMarkdown(markdown: string) {
 		}
 
 		const paragraph: string[] = [];
-		while (index < lines.length && lines[index].trim() && !/^```/.test(lines[index]) && !/^(#{1,3})\s+/.test(lines[index]) && !isListItem(lines[index])) {
+		while (index < lines.length && lines[index].trim() && !matchCodeFence(lines[index]) && !/^(#{1,3})\s+/.test(lines[index]) && !isListItem(lines[index])) {
 			paragraph.push(lines[index]);
 			index += 1;
 		}
