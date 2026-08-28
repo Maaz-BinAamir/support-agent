@@ -5,7 +5,6 @@
 		hasValidCitationMarkers,
 		removeCitationMarkers
 	} from '$lib/citations';
-	import { exampleQuestions, getDemoAnswer } from '$lib/demo-data';
 	import { renderMarkdown } from '$lib/markdown';
 	import type { AnswerResponse, SupportMessage } from '$lib/types';
 
@@ -18,6 +17,12 @@
 	const canSubmit = $derived(question.trim().length > 0 && !isSubmitting);
 	const hasMessages = $derived(messages.length > 0);
 	type StreamAnswer = { stream: ReadableStream<Uint8Array>; metadata: AnswerResponse };
+
+	const exampleQuestions = [
+		'How do I deploy my first Worker with Wrangler?',
+		'How should I configure a route for a Worker?',
+		'Where should local environment variables live during development?'
+	];
 
 	function createId(prefix: string) {
 		return `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
@@ -120,27 +125,21 @@
 	}
 
 	async function getAnswer(cleanQuestion: string): Promise<AnswerResponse | StreamAnswer> {
-		try {
-			const response = await fetch('/api/answer', {
-				method: 'POST',
-				headers: { 'content-type': 'application/json' },
-				body: JSON.stringify({ question: cleanQuestion })
-			});
-			if (response.ok) {
-				if (response.headers.get('content-type')?.includes('text/plain') && response.body) {
-					const encodedMetadata = response.headers.get('x-workers-metadata');
-					if (encodedMetadata) {
-						const metadata = JSON.parse(atob(encodedMetadata)) as AnswerResponse;
-						return { stream: response.body, metadata };
-					}
-				}
-				return await response.json();
+		const response = await fetch('/api/answer', {
+			method: 'POST',
+			headers: { 'content-type': 'application/json' },
+			body: JSON.stringify({ question: cleanQuestion })
+		});
+
+		if (!response.ok) throw new Error('Backend is offline.');
+		if (response.headers.get('content-type')?.includes('text/plain') && response.body) {
+			const encodedMetadata = response.headers.get('x-workers-metadata');
+			if (encodedMetadata) {
+				const metadata = JSON.parse(atob(encodedMetadata)) as AnswerResponse;
+				return { stream: response.body, metadata };
 			}
-		} catch {
-			// The UI remains useful as a local product preview before services are configured.
 		}
-		await new Promise((resolve) => setTimeout(resolve, 360));
-		return getDemoAnswer(cleanQuestion);
+		return await response.json();
 	}
 
 	function handleKeydown(event: KeyboardEvent) {
@@ -186,7 +185,7 @@
 			<div class="starter-grid">
 				<div class="starter-label"><span class="spark">✦</span> Start with a question</div>
 				<div class="example-list">
-					{#each exampleQuestions as example, index}
+					{#each exampleQuestions as example, index (example)}
 						<button class="example-card" onclick={() => useExample(example)}>
 							<span class="example-number">0{index + 1}</span>
 							<span>{example}</span>
@@ -194,6 +193,7 @@
 						</button>
 					{/each}
 				</div>
+
 			</div>
 		{:else}
 			<div class="conversation" aria-live="polite">

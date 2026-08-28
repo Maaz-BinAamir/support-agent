@@ -77,7 +77,7 @@ export const POST: RequestHandler = async ({ request, fetch }) => {
 			indexedAt: retrieval.indexed_at,
 			followUps: [],
 			retrievedCount: retrieval.passages.length,
-			scoreRange: `${Math.min(...scores).toFixed(2)}–${Math.max(...scores).toFixed(2)}`
+			scoreRange: `${Math.min(...scores).toFixed(2)} to ${Math.max(...scores).toFixed(2)}`
 		})
 	).toString('base64');
 
