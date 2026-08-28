@@ -7,6 +7,7 @@
     "dev": "vite dev",
     "build": "vite build",
     "check": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json",
+    "test": "bun test",
     "retrieval:dev": "uv --cache-dir .uv-cache --directory services/retrieval run python -c \"from app.main import run; run()\"",
     "retrieval:ingest": "uv --cache-dir .uv-cache --directory services/retrieval run python -c \"from app.ingest import main; main()\"",
     "preview": "vite preview",

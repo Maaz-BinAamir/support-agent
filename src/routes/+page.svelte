@@ -1,5 +1,10 @@
 <script lang="ts">
 	import { tick } from 'svelte';
+	import {
+		getCitationNumbers,
+		hasValidCitationMarkers,
+		removeCitationMarkers
+	} from '$lib/citations';
 	import { exampleQuestions, getDemoAnswer } from '$lib/demo-data';
 	import { renderMarkdown } from '$lib/markdown';
 	import type { AnswerResponse, SupportMessage } from '$lib/types';
@@ -63,8 +68,11 @@
 						.filter(Boolean)
 						.slice(0, 3)
 					: [];
-				const markers = [...answerMessage.content.matchAll(/\[(\d+)\]/g)].map((match) => Number(match[1]));
-				const validMarkers = markers.length > 0 && markers.every((marker) => marker >= 1 && marker <= response.metadata.citations.length);
+				const markers = getCitationNumbers(answerMessage.content);
+				const validMarkers = hasValidCitationMarkers(
+					answerMessage.content,
+					response.metadata.citations.length
+				);
 				const abstained = /I (?:cannot|couldn't|could not) verify|I don't have enough evidence/i.test(
 					answerMessage.content
 				);
@@ -75,11 +83,13 @@
 					answerMessage.status = 'failed';
 					return;
 				}
-				answerMessage.content = answerMessage.content
-					.replace(/\n?FOLLOW_UPS:\s*.+$/i, '')
-					.replace(/\s*\[(\d+)\]/g, '')
-					.trim();
-				answerMessage.citations = abstained ? [] : response.metadata.citations;
+				answerMessage.content = removeCitationMarkers(
+					answerMessage.content.replace(/\n?FOLLOW_UPS:\s*.+$/i, '')
+				).trim();
+				const citedPassages = new Set(markers);
+				answerMessage.citations = abstained
+					? []
+					: response.metadata.citations.filter((_, index) => citedPassages.has(index + 1));
 				answerMessage.followUps = abstained ? [] : followUps;
 				answerMessage.indexedAt = response.metadata.indexedAt;
 				answerMessage.retrievedCount = response.metadata.retrievedCount;
