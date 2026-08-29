@@ -23,8 +23,53 @@ function renderInline(value: string) {
 	return rendered.replace(/\0(\d+)\0/g, (_, index: string) => codeSpans[Number(index)] ?? '');
 }
 
+type ListItem = {
+	indent: number;
+	ordered: boolean;
+	content: string;
+};
+
+function getListItem(line: string): ListItem | null {
+	const match = line.match(/^(\s*)([-*+]|\d+[.)])\s+(.+)$/);
+	if (!match) return null;
+	return {
+		indent: match[1].length,
+		ordered: /^\d/.test(match[2]),
+		content: match[3]
+	};
+}
+
 function isListItem(line: string) {
-	return /^(?:[-*+] |\d+[.)] )/.test(line);
+	return Boolean(getListItem(line));
+}
+
+function renderList(lines: string[], startIndex: number) {
+	const firstItem = getListItem(lines[startIndex]);
+	if (!firstItem) return null;
+
+	const tag = firstItem.ordered ? 'ol' : 'ul';
+	const items: string[] = [];
+	let index = startIndex;
+
+	while (index < lines.length) {
+		const item = getListItem(lines[index]);
+		if (!item || item.indent !== firstItem.indent || item.ordered !== firstItem.ordered) break;
+		index += 1;
+
+		let nested = '';
+		while (index < lines.length) {
+			const child = getListItem(lines[index]);
+			if (!child || child.indent <= firstItem.indent) break;
+			const renderedChild = renderList(lines, index);
+			if (!renderedChild) break;
+			nested += renderedChild.html;
+			index = renderedChild.index;
+		}
+
+		items.push(`<li>${renderInline(item.content)}${nested}</li>`);
+	}
+
+	return { html: `<${tag}>${items.join('')}</${tag}>`, index };
 }
 
 function splitTableRow(line: string) {
@@ -109,18 +154,10 @@ export function renderMarkdown(markdown: string) {
 			continue;
 		}
 
-		const ordered = /^\d+[.)]\s+/.test(line);
-		if (isListItem(line)) {
-			const tag = ordered ? 'ol' : 'ul';
-			const itemPattern = ordered ? /^\d+[.)]\s+(.+)$/ : /^[-*+]\s+(.+)$/;
-			const items: string[] = [];
-			while (index < lines.length) {
-				const item = lines[index].match(itemPattern);
-				if (!item) break;
-				items.push(`<li>${renderInline(item[1])}</li>`);
-				index += 1;
-			}
-			blocks.push(`<${tag}>${items.join('')}</${tag}>`);
+		const list = renderList(lines, index);
+		if (list) {
+			blocks.push(list.html);
+			index = list.index;
 			continue;
 		}
 

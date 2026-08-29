@@ -7,11 +7,23 @@
 	} from '$lib/citations';
 	import { renderMarkdown } from '$lib/markdown';
 	import type { AnswerResponse, SupportMessage } from '$lib/types';
+	import openaiLogo from '$lib/assets/openai.svg';
+	import qwenLogo from '$lib/assets/qwen.svg';
+
+type ModelOption = {
+	id: 'qwen/qwen3.8-27b' | 'openai/gpt-oss-120b';
+	provider: string;
+	name: string;
+	logo: string;
+};
 
 	let question = $state('');
 	let isSubmitting = $state(false);
+	let activeRequest: AbortController | null = null;
 	let showDetails = $state<string | null>(null);
 	let messages = $state<SupportMessage[]>([]);
+	let selectedModel = $state<ModelOption['id']>('qwen/qwen3.8-27b');
+	let isModelMenuOpen = $state(false);
 	let composer: HTMLTextAreaElement;
 
 	const canSubmit = $derived(question.trim().length > 0 && !isSubmitting);
@@ -24,6 +36,18 @@
 		'Where should local environment variables live during development?'
 	];
 
+	const modelOptions: ModelOption[] = [
+		{ id: 'qwen/qwen3.8-27b', provider: 'Qwen', name: 'Qwen3.8 27B', logo: qwenLogo },
+		{ id: 'openai/gpt-oss-120b', provider: 'OpenAI', name: 'GPT-OSS 120B', logo: openaiLogo }
+	];
+
+	const selectedModelOption = $derived(modelOptions.find((model) => model.id === selectedModel) ?? modelOptions[0]);
+
+	function selectModel(model: ModelOption['id']) {
+		selectedModel = model;
+		isModelMenuOpen = false;
+	}
+
 	function createId(prefix: string) {
 		return `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
 	}
@@ -34,6 +58,13 @@
 
 		question = '';
 		isSubmitting = true;
+		const requestController = new AbortController();
+		let requestTimedOut = false;
+		const requestTimeout = window.setTimeout(() => {
+			requestTimedOut = true;
+			requestController.abort();
+		}, 20_000);
+		activeRequest = requestController;
 		const userMessage: SupportMessage = {
 			id: createId('user'),
 			role: 'user',
@@ -49,22 +80,42 @@
 			query: cleanQuestion
 		});
 		await tick();
+		resizeComposer();
 		document.getElementById('conversation-end')?.scrollIntoView({ behavior: 'smooth' });
 
 		try {
-			const response = await getAnswer(cleanQuestion);
+			const response = await getAnswer(cleanQuestion, requestController.signal);
 			const answerMessage = messages.find((message) => message.id === answerId);
 			if (!answerMessage) return;
 
 			if ('stream' in response) {
 				const reader = response.stream.getReader();
 				const decoder = new TextDecoder();
+				let streamedContent = '';
+				let pendingRender: Promise<void> | null = null;
+				const renderStream = () => {
+					if (pendingRender) return;
+					pendingRender = new Promise((resolve) => {
+						window.setTimeout(() => {
+							answerMessage.content = streamedContent;
+							pendingRender = null;
+							resolve();
+						});
+					});
+				};
 				while (true) {
 					const { done, value } = await reader.read();
 					if (done) break;
-					answerMessage.content += decoder.decode(value, { stream: true });
-					await tick();
+					streamedContent += decoder.decode(value, { stream: true });
+					if (streamedContent.length > 24_000) {
+						requestController.abort();
+						throw new Error('The response was too long.');
+					}
+					renderStream();
 				}
+				streamedContent += decoder.decode();
+				if (pendingRender) await pendingRender;
+				if (answerMessage.content !== streamedContent) answerMessage.content = streamedContent;
 				const followUpMatch = answerMessage.content.match(/\n?FOLLOW_UPS:\s*(.+)$/i);
 				const followUps = followUpMatch
 					? followUpMatch[1]
@@ -82,7 +133,8 @@
 					answerMessage.content
 				);
 				if (!validMarkers && !abstained) {
-					answerMessage.content = "I couldn't verify this answer against the indexed Workers documentation.";
+					answerMessage.content =
+					'The model did not cite the retrieved documentation, so this answer was not shown.';
 					answerMessage.citations = [];
 					answerMessage.followUps = [];
 					answerMessage.status = 'failed';
@@ -114,21 +166,28 @@
 		} catch {
 			const answerMessage = messages.find((message) => message.id === answerId);
 			if (answerMessage) {
-				answerMessage.content = 'The local retrieval service is unavailable. Start the retrieval service and try again.';
+				answerMessage.content = requestTimedOut
+					? 'The answer took too long. Please try again or choose a different model.'
+					: requestController.signal.aborted
+						? 'Answer stopped.'
+						: 'The answer could not finish. Please try again or choose a different model.';
 				answerMessage.status = 'failed';
 			}
 		} finally {
+			window.clearTimeout(requestTimeout);
+			if (activeRequest === requestController) activeRequest = null;
 			isSubmitting = false;
 			await tick();
 			document.getElementById('conversation-end')?.scrollIntoView({ behavior: 'smooth' });
 		}
 	}
 
-	async function getAnswer(cleanQuestion: string): Promise<AnswerResponse | StreamAnswer> {
+	async function getAnswer(cleanQuestion: string, signal: AbortSignal): Promise<AnswerResponse | StreamAnswer> {
 		const response = await fetch('/api/answer', {
 			method: 'POST',
 			headers: { 'content-type': 'application/json' },
-			body: JSON.stringify({ question: cleanQuestion })
+			body: JSON.stringify({ question: cleanQuestion, model: selectedModel }),
+			signal
 		});
 
 		if (!response.ok) throw new Error('Backend is offline.');
@@ -140,6 +199,17 @@
 			}
 		}
 		return await response.json();
+	}
+
+	function stopAnswer() {
+		activeRequest?.abort();
+	}
+
+	function resizeComposer() {
+		if (!composer) return;
+		composer.style.height = 'auto';
+		composer.style.height = `${Math.min(composer.scrollHeight, 130)}px`;
+		composer.style.overflowY = composer.scrollHeight > 130 ? 'auto' : 'hidden';
 	}
 
 	function handleKeydown(event: KeyboardEvent) {
@@ -170,6 +240,7 @@
 			<span class="mark" aria-hidden="true"><i></i><i></i><i></i></span>
 			<span>Support Agent</span>
 		</a>
+
 	</header>
 
 	<section class:has-messages={hasMessages} class="hero">
@@ -205,9 +276,13 @@
 						</article>
 					{:else}
 						<article class="message answer-message">
-							<div class="answer-heading"><span class="answer-icon">✦</span><span>Support Agent</span><span class="answer-rule"></span>{#if message.status === 'streaming'}<span class="live-label">Writing</span>{:else if message.status === 'failed'}<span class="live-label failed">Offline</span>{:else}<span class="live-label">Grounded</span>{/if}</div>
+							<div class="answer-heading"><span class="answer-icon">✦</span><span>Support Agent</span><span class="answer-rule"></span>{#if message.status === 'streaming'}<span class="live-label">Writing</span>{:else if message.status === 'failed'}<span class="live-label failed">Unverified</span>{:else}<span class="live-label">Grounded</span>{/if}</div>
 							<div class="answer-copy">
-								{@html renderMarkdown(message.content)}{#if message.status === 'streaming'}<span class="cursor" aria-hidden="true"></span>{/if}
+								{#if message.status === 'streaming'}
+									<p class="streaming-answer">{message.content}<span class="cursor" aria-hidden="true"></span></p>
+								{:else}
+									{@html renderMarkdown(message.content)}
+								{/if}
 							</div>
 
 							{#if message.status === 'complete' && message.citations?.length}
@@ -257,15 +332,33 @@
 		{/if}
 
 		<form class="composer" onsubmit={(event) => { event.preventDefault(); void submitQuestion(); }}>
-			<div class="composer-topline"><span class="composer-status"><span class="status-dot"></span> Indexed docs only</span><span>Shift + Enter for a new line</span></div>
 			<div class="composer-field">
-				<textarea bind:this={composer} bind:value={question} onkeydown={handleKeydown} rows="1" placeholder="Ask about deploying, routing, or configuring a Worker…" aria-label="Ask a Workers question"></textarea>
-				<button class="send-button" type="submit" disabled={!canSubmit} aria-label="Send question">
-					{#if isSubmitting}<span class="send-spinner"></span>{:else}<svg viewBox="0 0 20 20" aria-hidden="true"><path d="M3 10h12M10 5l5 5-5 5" /></svg>{/if}
-				</button>
+				<textarea bind:this={composer} bind:value={question} onkeydown={handleKeydown} oninput={resizeComposer} rows="1" placeholder="Ask about deploying, routing, or configuring a Worker…" aria-label="Ask a Workers question"></textarea>
+				<div class="composer-model-inline">
+				<div class="model-picker">
+					<button class:openai={selectedModelOption.id === 'openai/gpt-oss-120b'} class="model-trigger" type="button" aria-haspopup="listbox" aria-expanded={isModelMenuOpen} onclick={() => (isModelMenuOpen = !isModelMenuOpen)}>
+						<img src={selectedModelOption.logo} alt="" />
+						<span><small>{selectedModelOption.provider}</small>{selectedModelOption.name}</span>
+						<svg class="model-chevron" class:open={isModelMenuOpen} viewBox="0 0 12 12" aria-hidden="true"><path d="m2.5 4.5 3.5 3 3.5-3" /></svg>
+					</button>
+					{#if isModelMenuOpen}
+						<div class="model-menu" role="listbox" aria-label="Language model">
+							{#each modelOptions as model (model.id)}
+								<button class:active={selectedModel === model.id} class:openai={model.id === 'openai/gpt-oss-120b'} class="model-option" type="button" role="option" aria-selected={selectedModel === model.id} onclick={() => selectModel(model.id)}>
+									<img src={model.logo} alt="" />
+									<span><small>{model.provider}</small>{model.name}</span>
+								</button>
+							{/each}
+						</div>
+					{/if}
+				</div>
+			</div>				{#if isSubmitting}
+					<button class="send-button stop-button" type="button" onclick={stopAnswer} aria-label="Stop generating"><span></span></button>
+				{:else}
+					<button class="send-button" type="submit" disabled={!canSubmit} aria-label="Send question"><svg viewBox="0 0 20 20" aria-hidden="true"><path d="M3 10h12M10 5l5 5-5 5" /></svg></button>
+				{/if}
 			</div>
+
 		</form>
 	</section>
-
-	<footer class="footer-note"><span>Answers are grounded in a dated snapshot of official Cloudflare Workers documentation.</span><span>Built for careful questions.</span></footer>
 </main>

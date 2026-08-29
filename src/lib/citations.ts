@@ -1,4 +1,5 @@
-const citationMarkerPattern = /\[(\d+)\]|【(\d+)】/g;
+const citationMarkerPattern = /\[(\d+)(?:†[^\]]*)?\]|【(\d+)(?:†[^】]*)?】/g;
+const citationMarkerWithSpacePattern = /\s*(?:\[\d+(?:†[^\]]*)?\]|【\d+(?:†[^】]*)?】)/g;
 
 export function getCitationNumbers(answer: string): number[] {
   return [...answer.matchAll(citationMarkerPattern)].map((match) =>
@@ -21,5 +22,5 @@ export function hasValidCitationMarkers(
 }
 
 export function removeCitationMarkers(answer: string): string {
-  return answer.replace(/\s*(?:\[\d+\]|【\d+】)/g, "");
+  return answer.replace(citationMarkerWithSpacePattern, "");
 }

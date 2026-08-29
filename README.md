@@ -38,7 +38,7 @@ The live request does not fetch Cloudflare. Groq only sees the question and thos
 | Layer | Tools |
 | --- | --- |
 | Interface | Svelte 5.56, SvelteKit 2.70, Vite 7, TypeScript 5.9, Bun 1.4 |
-| Generation | Vercel AI SDK 5, Groq `openai/gpt-oss-120b` |
+| Generation | Vercel AI SDK 5, Groq `qwen/qwen3.8-27b` by default with selectable `openai/gpt-oss-120b` |
 | Retrieval | FastAPI, Python 3.13, SentenceTransformers `Alibaba-NLP/gte-multilingual-base`, LanceDB |
 
 ## Run locally

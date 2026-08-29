@@ -367,7 +367,7 @@ The system instruction tells the model to:
 - finish with the exact `FOLLOW_UPS:` format;
 - omit URLs from the generated text.
 
-Groq is configured with the `openai/gpt-oss-120b` model and temperature `0.1`.
+Groq defaults to `qwen/qwen3.8-27b` and lets the picker select `openai/gpt-oss-120b`; both use temperature `0.1`.
 
 ### Streaming response and metadata
 
